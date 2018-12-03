@@ -15,7 +15,7 @@ def logger(input_object):
 
 class Travian:
     def __init__(self, server, input_name, input_password):
-        # pre
+        # init
         self.server = server
         self.root_url = f"https://{self.server}.travian.tw/"
         self.username = input_name
@@ -39,6 +39,7 @@ class Travian:
 
     class Village:
         def __init__(self, browser, root_url):
+            # init
             self.browser = browser
             self.root_url = root_url
             # data array/dict
@@ -142,11 +143,9 @@ class Travian:
                 "41": "放牧水槽"
             }
 
-        def print_area(self):
-            res = self.browser.open(self.root_url + "dorf1.php")
-            area_list = BeautifulSoup(res.content, "html.parser").find_all("area")
-            for area in area_list:
-                print(area.get("alt"), area.get("href"))
+            # class
+            self.update_level_status()
+
 
         def update_level_status(self):
             self._update_resource_status()
@@ -176,6 +175,7 @@ class Travian:
                         oid = area.get("href").split("=")[1]
                         level = area.get("alt").split()[2]
                         self.area_status["steel"][oid] = int(level)
+            logger("[core] updating resource status is done.")
 
         def _update_building_status(self):
             url = self.root_url + "dorf2.php"
@@ -199,9 +199,10 @@ class Travian:
                     if slot_item_list[0] == "labelLayer":
                         level = slot.string
                         self.building_status[self.gid_dict[gid]][oid] = int(level)
+            logger("[core] updating building status is done.")
 
         def upgrade(self, oid):
-            url = f"https://ts2.travian.tw/build.php?id={oid}"
+            url = self.root_url + f"build.php?id={oid}"
             res = self.browser.open(url)
             button_list = BeautifulSoup(res.content, "html.parser").find_all("button")
             for button in button_list:
@@ -211,7 +212,7 @@ class Travian:
                     if len(url_list_found) == 1:
                         postfix = url_list_found[0]
                         self.browser.get(self.root_url + postfix)
-                        logger(f"call upgrade oid[{oid}] success")
+                        logger(f"[VILLAGE] call upgrade oid[{oid}] success")
                         return "green"  # upgraded success.
                     else:
                         logger("[ERROR] Multiple url list found! : "+ str(url_list))
@@ -249,6 +250,7 @@ class Travian:
                 try:
                     self.browser.select_form("form[action=/start_adventure.php]")
                     self.browser.submit_selected()
+                    logger("[Hero] Go Adventure.")
                     return "success"
                 except mechanicalsoup.utils.LinkNotFoundError:
                     logger("Hero is not in Village.")

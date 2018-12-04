@@ -42,18 +42,65 @@ class Travian:
             # init
             self.browser = browser
             self.root_url = root_url
-            # data array/dict
+            # static dict
             self.alias = {
                 "farm": "農場",
                 "brick": "泥坑",
                 "wood": "伐木場",
                 "steel": "鐵礦場"
             }
-            self.area_status = {
-                "farm": {},
-                "brick": {},
-                "wood": {},
-                "steel": {}
+            self.gid_dict = {
+                "1": "伐木場",
+                "2": "泥坑",
+                "3": "鐵礦場",
+                # "4": "農地",
+                "4": "農場",
+                "5": "鋸木廠",
+                "6": "磚廠",
+                "7": "鋼鐵鑄造廠",
+                "8": "麵粉廠",
+                "9": "麵包店",
+                "10": "倉庫",
+                "11": "穀倉",
+                "12": "鐵匠",
+                "13": "盔甲廠",
+                "14": "競技場",
+                "15": "村莊大樓",
+                "16": "集結點",
+                "17": "市場",
+                "18": "大使館",
+                "19": "兵營",
+                "20": "馬廄",
+                "21": "工場",
+                "22": "研究院",
+                "23": "山洞",
+                "24": "城鎮廳",
+                "25": "行宮",
+                "26": "皇宮",
+                "27": "寶物庫",
+                "28": "交易所",
+                "29": "大兵營",
+                "30": "大馬棚",
+                "31": "城牆",
+                "32": "土牆",
+                "33": "木牆",
+                "34": "石匠舖",
+                "35": "釀酒廠",
+                "36": "陷阱",
+                "37": "英雄宅",
+                "38": "大倉庫",
+                "39": "大穀倉",
+                "40": "世界奇觀",
+                "41": "放牧水槽"
+            }
+            # Dynamic dict (data)
+            self.last_upgrade_oid = ""
+            self.stock = []
+            self.resource_status = {
+                "農場": {},
+                "泥坑": {},
+                "伐木場": {},
+                "鐵礦場": {}
             }
             self.building_status = {
                 "blank": [],
@@ -99,85 +146,53 @@ class Travian:
                 "世界奇觀": {},
                 "放牧水槽": {}
             }
-            self.gid_dict = {
-                # "1": "伐木場",
-                # "2": "泥坑",
-                # "3": "鐵礦場",
-                # "4": "農地",
-                "5": "鋸木廠",
-                "6": "磚廠",
-                "7": "鋼鐵鑄造廠",
-                "8": "麵粉廠",
-                "9": "麵包店",
-                "10": "倉庫",
-                "11": "穀倉",
-                "12": "鐵匠",
-                "13": "盔甲廠",
-                "14": "競技場",
-                "15": "村莊大樓",
-                "16": "集結點",
-                "17": "市場",
-                "18": "大使館",
-                "19": "兵營",
-                "20": "馬廄",
-                "21": "工場",
-                "22": "研究院",
-                "23": "山洞",
-                "24": "城鎮廳",
-                "25": "行宮",
-                "26": "皇宮",
-                "27": "寶物庫",
-                "28": "交易所",
-                "29": "大兵營",
-                "30": "大馬棚",
-                "31": "城牆",
-                "32": "土牆",
-                "33": "木牆",
-                "34": "石匠舖",
-                "35": "釀酒廠",
-                "36": "陷阱",
-                "37": "英雄宅",
-                "38": "大倉庫",
-                "39": "大穀倉",
-                "40": "世界奇觀",
-                "41": "放牧水槽"
-            }
+            # method
+            self.update_all_status()
 
-            # class
-            self.update_level_status()
+        def update_all_status(self):
+            self._update_resource_level()
+            self._update_building_level()
+            self._update_stock()
 
+        def _update_stock(self):
+            url = self.root_url + "dorf1.php"
+            res = self.browser.open(url)
+            wood_stock = BeautifulSoup(res.content, "html.parser").find("span", id="l1").string
+            brick_stock = BeautifulSoup(res.content, "html.parser").find("span", id="l2").string
+            steel_stock = BeautifulSoup(res.content, "html.parser").find("span", id="l3").string
+            food_stock = BeautifulSoup(res.content, "html.parser").find("span", id="l4").string
+            food_balance = BeautifulSoup(res.content, "html.parser").find("span", id="stockBarFreeCrop").string
+            self.stock[0] = int(str(wood_stock).strip().replace(",","").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[1] = int(str(brick_stock).strip().replace(",","").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[2] = int(str(steel_stock).strip().replace(",","").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[3] = int(str(food_stock).strip().replace(",","").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[4] = int(str(food_balance).strip().replace(",","").lstrip("\u202d").rstrip("\u202c"))
 
-        def update_level_status(self):
-            self._update_resource_status()
-            self._update_building_status()
-            # print(self.area_status)
-            # print(self.building_status)
-
-        def _update_resource_status(self):
+        def _update_resource_level(self):
             url = self.root_url + "dorf1.php"
             res = self.browser.open(url)
             area_list = BeautifulSoup(res.content, "html.parser").find_all("area")
             for area in area_list:
                 if "=" in area.get("href"):
-                    if self.alias["farm"] == area.get("alt").split()[0]:
+                    if "農場" == area.get("alt").split()[0]:
                         oid = area.get("href").split("=")[1]
                         level = area.get("alt").split()[2]
-                        self.area_status["farm"][oid] = int(level)
-                    elif self.alias["brick"] == area.get("alt").split()[0]:
+                        self.resource_status["農場"][oid] = int(level)
+                    elif "泥坑" == area.get("alt").split()[0]:
                         oid = area.get("href").split("=")[1]
                         level = area.get("alt").split()[2]
-                        self.area_status["brick"][oid] = int(level)
-                    elif self.alias["wood"] == area.get("alt").split()[0]:
+                        self.resource_status["泥坑"][oid] = int(level)
+                    elif "伐木場" == area.get("alt").split()[0]:
                         oid = area.get("href").split("=")[1]
                         level = area.get("alt").split()[2]
-                        self.area_status["wood"][oid] = int(level)
-                    elif self.alias["steel"] == area.get("alt").split()[0]:
+                        self.resource_status["伐木場"][oid] = int(level)
+                    elif "鐵礦場" == area.get("alt").split()[0]:
                         oid = area.get("href").split("=")[1]
                         level = area.get("alt").split()[2]
-                        self.area_status["steel"][oid] = int(level)
+                        self.resource_status["鐵礦場"][oid] = int(level)
             logger("[core] updating resource status is done.")
 
-        def _update_building_status(self):
+        def _update_building_level(self):
             url = self.root_url + "dorf2.php"
             res = self.browser.open(url)
             village_map = BeautifulSoup(res.content, "html.parser").find(id="village_map")
@@ -195,7 +210,7 @@ class Travian:
                         elif gid == "0":  # blank area
                             level_watcher = False
                             self.building_status["blank"].append(oid)
-                if level_watcher:
+                if level_watcher is True:
                     if slot_item_list[0] == "labelLayer":
                         level = slot.string
                         self.building_status[self.gid_dict[gid]][oid] = int(level)
@@ -213,6 +228,7 @@ class Travian:
                         postfix = url_list_found[0]
                         self.browser.get(self.root_url + postfix)
                         logger(f"[VILLAGE] call upgrade oid[{oid}] success")
+                        self.last_upgrade_oid = oid
                         return "green"  # upgraded success.
                     else:
                         logger("[ERROR] Multiple url list found! : "+ str(url_list))

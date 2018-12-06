@@ -95,7 +95,7 @@ class Travian:
             }
             # Dynamic dict (data)
             self.last_upgrade_oid = ""
-            self.stock = []
+            self.stock = [0, 0, 0, 0, 0]
             self.resource_status = {
                 "農場": {},
                 "泥坑": {},
@@ -151,8 +151,8 @@ class Travian:
 
         def update_all_status(self):
             self._update_resource_level()
-            self._update_building_level()
             self._update_stock()
+            self._update_building_level()
 
         def _update_stock(self):
             url = self.root_url + "dorf1.php"
@@ -162,11 +162,11 @@ class Travian:
             steel_stock = BeautifulSoup(res.content, "html.parser").find("span", id="l3").string
             food_stock = BeautifulSoup(res.content, "html.parser").find("span", id="l4").string
             food_balance = BeautifulSoup(res.content, "html.parser").find("span", id="stockBarFreeCrop").string
-            self.stock[0] = int(str(wood_stock).strip().replace(",","").lstrip("\u202d").rstrip("\u202c"))
-            self.stock[1] = int(str(brick_stock).strip().replace(",","").lstrip("\u202d").rstrip("\u202c"))
-            self.stock[2] = int(str(steel_stock).strip().replace(",","").lstrip("\u202d").rstrip("\u202c"))
-            self.stock[3] = int(str(food_stock).strip().replace(",","").lstrip("\u202d").rstrip("\u202c"))
-            self.stock[4] = int(str(food_balance).strip().replace(",","").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[0] = int(str(wood_stock).strip().replace(",", "").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[1] = int(str(brick_stock).strip().replace(",", "").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[2] = int(str(steel_stock).strip().replace(",", "").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[3] = int(str(food_stock).strip().replace(",", "").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[4] = int(str(food_balance).strip().replace(",", "").lstrip("\u202d").rstrip("\u202c"))
 
         def _update_resource_level(self):
             url = self.root_url + "dorf1.php"
@@ -198,6 +198,8 @@ class Travian:
             village_map = BeautifulSoup(res.content, "html.parser").find(id="village_map")
             building_slot_list = BeautifulSoup(str(village_map), "html.parser").find_all("div")
             level_watcher = False
+            gid = 0
+            oid = 0
             for slot in building_slot_list:
                 slot_item_list = slot.get("class")
                 if len(slot_item_list) > 2:
@@ -229,12 +231,25 @@ class Travian:
                         self.browser.get(self.root_url + postfix)
                         logger(f"[VILLAGE] call upgrade oid[{oid}] success")
                         self.last_upgrade_oid = oid
+                        self.update_all_status()
                         return "green"  # upgraded success.
                     else:
-                        logger("[ERROR] Multiple url list found! : "+ str(url_list))
+                        logger("[ERROR] Multiple url list found! : " + str(url_list))
                 # "gold builder" means not yet or resources insufficient.
                 elif {"gold", "builder"} == set(button.get("class")):
                     return "gold"
+
+        def _tmp_find_token(self, oid):
+            url = self.root_url + f"build.php?id={oid}"
+            res = self.browser.open(url)
+            button_list = BeautifulSoup(res.content, "html.parser").find_all("button")
+            for button in button_list:
+                if {"green", "build"} == set(button.get("class")):
+                    url_list_found = re.findall(r"'(\S*)'", button.get("onclick"))
+                    return url_list_found
+                elif {"gold", "builder"} == set(button.get("class")):
+                    url_list_found = re.findall(r"'(\S*)'", button.get("onclick"))
+                    return url_list_found
 
         def get_building_queue_timer(self):
             timer_list = []
@@ -260,7 +275,6 @@ class Travian:
                 tr_string = str(tr.get("id"))
                 if "adventure" in tr_string:
                     adventure_list.append(tr_string.replace("adventure", ""))
-            # print(adventure_list)
             if len(adventure_list) > 0:
                 self.browser.open(self.root_url + f"start_adventure.php?from=list&kid={adventure_list[0]}")
                 try:
@@ -269,6 +283,8 @@ class Travian:
                     logger("[Hero] Go Adventure.")
                     return "success"
                 except mechanicalsoup.utils.LinkNotFoundError:
-                    logger("Hero is not in Village.")
+                    logger("[Hero] Hero is not in Village.")
                     return "unavailable"
-
+            else:
+                logger("[Hero] No adventure available.")
+                return "blank_list"

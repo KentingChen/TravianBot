@@ -1,6 +1,4 @@
-import requests
 import mechanicalsoup
-import base64
 from bs4 import BeautifulSoup
 import re
 from datetime import datetime
@@ -219,6 +217,7 @@ class Travian:
                     if slot_item_list[0] == "labelLayer":
                         level = slot.string
                         self.building_status[gid_dict[gid]][oid] = int(level)
+                        level_watcher = False
             logger("[core] updating building status is done.")
 
         def upgrade(self, oid):
@@ -354,10 +353,11 @@ class AlgoRunAs:
                     gid = resource_list.index(min(resource_list[0:4])) + 1
                 status_dict = self.my_travian_account.Village.resource_status[gid_dict[str(gid)]]
                 oid = min(status_dict, key=status_dict.get)
-                if oid == self.my_travian_account.Village.last_upgrade_oid:
-                    tmp_dict = dict(status_dict)
-                    tmp_dict.pop(oid)
-                    oid = min(tmp_dict, key=tmp_dict.get)
+                if len(status_dict) > 1:
+                    if oid == self.my_travian_account.Village.last_upgrade_oid:
+                        tmp_dict = dict(status_dict)
+                        tmp_dict.pop(oid)
+                        oid = min(tmp_dict, key=tmp_dict.get)
                 status = self.my_travian_account.Village.upgrade(oid)
                 if status == "green":
                     time.sleep(random.randint(10, 20))

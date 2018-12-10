@@ -1,4 +1,4 @@
-from TravianBot import Travian, AlgoMethods
+from TravianBot import Travian, AlgoRunAs
 import base64
 
 username = "my_username"

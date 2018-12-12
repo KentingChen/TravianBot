@@ -4,6 +4,7 @@ import re
 from datetime import datetime
 import time
 import random
+import pprint
 
 
 gid_dict = {
@@ -57,6 +58,12 @@ def logger(input_object):
     print(input_object)
 
 
+def pprint_two_dicts_not_empty(d1, d2):
+    not_empty_d2 = {k: v for k, v in d2.items() if bool(v) is True}
+    d1.update(not_empty_d2)
+    pprint.pprint(d1)
+
+
 class Travian:
     def __init__(self, server, input_name, input_password):
         # init
@@ -69,20 +76,42 @@ class Travian:
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_1) AppleWebKit/537.36 ("
                        "KHTML, like Gecko) Chrome/70.0.3538.110 Safari/537.36"
         )
+        self.current_newdid = ""
+        self.village_newdid_list = []
 
         # class
-        self.login()
-        self.Village = self.Village(browser=self.browser, root_url=self.root_url)
+        self._login()
+        self._fetch_all_villa_list()
+        pprint.pprint(self.village_newdid_list)
+        self.Village = None  # self._Village(self.browser, self.root_url)
+        self.goto(self.village_newdid_list[0])
         self.Hero = self.Hero(browser=self.browser, root_url=self.root_url)
 
-    def login(self):
+    def _login(self):
         self.browser.open(self.root_url)
         self.browser.select_form("form[action=dorf1.php]")
         self.browser["name"] = self.username
         self.browser["password"] = self.password
         self.browser.submit_selected()
 
-    class Village:
+    def _fetch_all_villa_list(self):
+        url = self.root_url + "dorf1.php"
+        res = self.browser.open(url)
+        html_village_list = BeautifulSoup(res.content, "html.parser").find(id="sidebarBoxVillagelist")
+        li_list = BeautifulSoup(str(html_village_list), "html.parser").find_all("a")
+        for a in li_list:
+            newdid = a.get("href").split("=")[1].replace("&", "")
+            self.village_newdid_list.append(newdid)
+
+    def goto(self, newdid):
+        newdid = str(newdid)
+        newdid_link = self.root_url + f"dorf1.php?newdid={newdid}&"
+        self.current_newdid = newdid
+        self.browser.open(newdid_link)
+        self.Village = self._Village(self.browser, self.root_url)
+        # self.Village.update_all_status()
+
+    class _Village:
         def __init__(self, browser, root_url):
             # init
             self.browser = browser
@@ -150,9 +179,12 @@ class Travian:
             # method
             self.update_all_status()
 
+            # if current_village_link != "":
+            #    self.browser.open(current_village_link)
+
         def update_all_status(self):
             self._update_resource_level()
-            self._update_stock()
+            # self._update_stock()
             self._update_building_level()
 
         def _update_stock(self):
@@ -172,6 +204,7 @@ class Travian:
         def _update_resource_level(self):
             url = self.root_url + "dorf1.php"
             res = self.browser.open(url)
+            # resouce
             area_list = BeautifulSoup(res.content, "html.parser").find_all("area")
             for area in area_list:
                 if "=" in area.get("href"):
@@ -191,7 +224,17 @@ class Travian:
                         oid = area.get("href").split("=")[1]
                         level = area.get("alt").split()[2]
                         self.resource_status["鐵礦場"][oid] = int(level)
-            logger("[core] updating resource status is done.")
+            # stock
+            wood_stock = BeautifulSoup(res.content, "html.parser").find("span", id="l1").string
+            brick_stock = BeautifulSoup(res.content, "html.parser").find("span", id="l2").string
+            steel_stock = BeautifulSoup(res.content, "html.parser").find("span", id="l3").string
+            food_stock = BeautifulSoup(res.content, "html.parser").find("span", id="l4").string
+            food_balance = BeautifulSoup(res.content, "html.parser").find("span", id="stockBarFreeCrop").string
+            self.stock[0] = int(str(wood_stock).strip().replace(",", "").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[1] = int(str(brick_stock).strip().replace(",", "").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[2] = int(str(steel_stock).strip().replace(",", "").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[3] = int(str(food_stock).strip().replace(",", "").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[4] = int(str(food_balance).strip().replace(",", "").lstrip("\u202d").rstrip("\u202c"))
 
         def _update_building_level(self):
             url = self.root_url + "dorf2.php"
@@ -218,9 +261,20 @@ class Travian:
                         level = slot.string
                         self.building_status[gid_dict[gid]][oid] = int(level)
                         level_watcher = False
-            logger("[core] updating building status is done.")
+            # stock
+            wood_stock = BeautifulSoup(res.content, "html.parser").find("span", id="l1").string
+            brick_stock = BeautifulSoup(res.content, "html.parser").find("span", id="l2").string
+            steel_stock = BeautifulSoup(res.content, "html.parser").find("span", id="l3").string
+            food_stock = BeautifulSoup(res.content, "html.parser").find("span", id="l4").string
+            food_balance = BeautifulSoup(res.content, "html.parser").find("span", id="stockBarFreeCrop").string
+            self.stock[0] = int(str(wood_stock).strip().replace(",", "").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[1] = int(str(brick_stock).strip().replace(",", "").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[2] = int(str(steel_stock).strip().replace(",", "").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[3] = int(str(food_stock).strip().replace(",", "").lstrip("\u202d").rstrip("\u202c"))
+            self.stock[4] = int(str(food_balance).strip().replace(",", "").lstrip("\u202d").rstrip("\u202c"))
 
         def upgrade(self, oid):
+            oid = str(oid)
             url = self.root_url + f"build.php?id={oid}"
             res = self.browser.open(url)
             button_list = BeautifulSoup(res.content, "html.parser").find_all("button")
@@ -233,7 +287,7 @@ class Travian:
                         self.browser.get(self.root_url + postfix)
                         logger(f"[VILLAGE] call upgrade oid[{oid}] success")
                         self.last_upgrade_oid = oid
-                        self.update_all_status()
+                        # self.update_all_status()
                         return "green"  # upgraded success.
                     else:
                         logger("[ERROR] Multiple url list found! : " + str(url_list))
@@ -295,14 +349,111 @@ class Travian:
 class AlgoRunAs:
     def __init__(self, travian_object):
         global gid_dict
-        self.my_travian_account = travian_object
+        self.TRAVIAN = travian_object
 
-    def build_by_oid(self, build_oid_queue):
+    def all_build_by_gid(self, gid_queue_dict):
+        adventure_time = time.time()
+        last_oid_dict = {}.fromkeys(self.TRAVIAN.village_newdid_list)
+        pprint.pprint(gid_queue_dict)
+        while any(l for l in gid_queue_dict.values()):
+            try:
+                for newdid in self.TRAVIAN.village_newdid_list:
+                    if newdid in gid_queue_dict and bool(gid_queue_dict[newdid]) is True:
+                        self.TRAVIAN.goto(newdid)
+                        # self.TRAVIAN.Village.update_all_status()
+                        last_gid = str(gid_queue_dict[newdid][0])
+                        if int(last_gid) > 4:
+                            status_dict = self.TRAVIAN.Village.building_status[gid_dict[last_gid]]
+                            oid = min(status_dict, key=status_dict.get)
+                        else:
+                            status_dict = self.TRAVIAN.Village.resource_status[gid_dict[last_gid]]
+                            oid = min(status_dict, key=status_dict.get)
+                            if oid == last_oid_dict[newdid]:
+                                tmp_dict = dict(status_dict)
+                                tmp_dict.pop(oid)
+                                oid = min(tmp_dict, key=tmp_dict.get)
+                        status = self.TRAVIAN.Village.upgrade(oid)
+                        if status == "green":
+                            logger(f"[UPGRADE] : [vid:{newdid}] - {gid_dict[last_gid]}")
+                            last_oid_dict[newdid] = oid
+                            gid_queue_dict[newdid].pop(0)
+                            pprint.pprint(gid_queue_dict)
+                    time.sleep(random.randint(3, 5))
+                time.sleep(random.randint(30, 60))
+                if time.time() > adventure_time + random.randint(3600, 4800):
+                    self.TRAVIAN.Hero.go_adventure()
+                    adventure_time = time.time()
+                    time.sleep(random.randint(3, 5))
+            except ConnectionError:
+                logger("[Error] Connection Error occured.")
+            except KeyboardInterrupt:
+                logger("[Stop] by Keyboard Interruption.")
+                pprint.pprint(gid_queue_dict)
+                exit(0)
+        logger("[DONE] All queues are empty.")
+
+    def all_auto_by_min_resource(self):
+        adventure_time = time.time()
+        last_oid_dict = {}.fromkeys(self.TRAVIAN.village_newdid_list)
+        pprint_two_dicts_not_empty(self.TRAVIAN.Village.resource_status, self.TRAVIAN.Village.building_status)
+        while 1:
+            try:
+                for newdid in self.TRAVIAN.village_newdid_list:
+                    self.TRAVIAN.goto(newdid)
+                    if len(self.TRAVIAN.Village.resource_status["農場"]) == 15:  # 15 田
+                        status_dict = self.TRAVIAN.Village.resource_status[gid_dict[str(4)]]
+                        min_food_level = status_dict[min(status_dict, key=status_dict.get)]
+                        brick_level = self.TRAVIAN.Village.resource_status["泥坑"]["16"]
+                        wood_level = self.TRAVIAN.Village.resource_status["伐木場"]["3"]
+                        steel_level = self.TRAVIAN.Village.resource_status["鐵礦場"]["4"]
+                        if brick_level < min_food_level - 3:
+                            oid = "16"
+                            gid = "2"
+                        elif wood_level < min_food_level - 3:
+                            oid = "3"
+                            gid = "1"
+                        elif steel_level < min_food_level - 3:
+                            oid = "4"
+                            gid = "3"
+                        else:
+                            oid = min(status_dict, key=status_dict.get)
+                            gid = "4"
+                    else:
+                        stock_list = self.TRAVIAN.Village.stock
+                        if stock_list[4] < 15:
+                            gid = "4"  # farm
+                        else:
+                            gid = stock_list.index(min(stock_list[0:4])) + 1
+                        status_dict = self.TRAVIAN.Village.resource_status[gid_dict[str(gid)]]
+                        oid = min(status_dict, key=status_dict.get)
+                        if len(status_dict) > 1:
+                            if oid == last_oid_dict[newdid]:
+                                tmp_dict = dict(status_dict)
+                                tmp_dict.pop(oid)
+                                oid = min(tmp_dict, key=tmp_dict.get)
+                    status = self.TRAVIAN.Village.upgrade(oid)
+                    if status == "green":
+                        logger(f"[UPGRADE] : [vid:{newdid}] - {gid_dict[gid]}")
+                        last_oid_dict[newdid] = oid
+                    time.sleep(random.randint(3, 5))
+                time.sleep(random.randint(30, 60))
+                if time.time() > adventure_time + random.randint(3600, 4800):
+                    self.TRAVIAN.Hero.go_adventure()
+                    adventure_time = time.time()
+                    time.sleep(random.randint(3, 5))
+
+            except ConnectionError:
+                logger("[Error] Connection Error occured.")
+            except KeyboardInterrupt:
+                logger("[Stop] by Keyboard Interruption.")
+                exit(0)
+
+    def _old_build_by_oid(self, build_oid_queue):
         while 1:
             try:
                 while len(build_oid_queue) > 0:
                     oid = build_oid_queue[0]
-                    status = self.my_travian_account.Village.upgrade(oid)
+                    status = self.TRAVIAN.Village.upgrade(oid)
                     if status == "green":
                         done_oid = build_oid_queue.pop(0)
                         logger(f"oid({done_oid}) is building.")
@@ -317,22 +468,23 @@ class AlgoRunAs:
             except ConnectionError:
                 logger("[ERROR] Connection Error occurred!")
                 time.sleep(random.randint(180, 200))
-                self.my_travian_account = Travian("ts2", username, password)
+                self.TRAVIAN = Travian("ts2", username, password)
 
-    def build_by_gid(self, gid_queue):
+    def _old_build_by_gid(self, gid_queue):
         while len(gid_queue) > 0:
             last_gid = str(gid_queue[0])
+            self.TRAVIAN.update_all_status()
             if int(last_gid) > 4:
-                status_dict = self.my_travian_account.Village.building_status[gid_dict[last_gid]]
+                status_dict = self.TRAVIAN.Village.building_status[gid_dict[last_gid]]
                 oid = min(status_dict, key=status_dict.get)
             else:
-                status_dict = self.my_travian_account.Village.resource_status[gid_dict[last_gid]]
+                status_dict = self.TRAVIAN.Village.resource_status[gid_dict[last_gid]]
                 oid = min(status_dict, key=status_dict.get)
-                if oid == self.my_travian_account.Village.last_upgrade_oid:
+                if oid == self.TRAVIAN.Village.last_upgrade_oid:
                     tmp_dict = dict(status_dict)
                     tmp_dict.pop(oid)
                     oid = min(tmp_dict, key=tmp_dict.get)
-            status = self.my_travian_account.Village.upgrade(oid)
+            status = self.TRAVIAN.Village.upgrade(oid)
             if status == "green":
                 logger(f"[UPGRADE] : {gid_dict[last_gid]}")
                 time.sleep(random.randint(10, 20))
@@ -342,31 +494,31 @@ class AlgoRunAs:
         logger("build oid queue is empty now, exit...")
         exit(0)
 
-    def auto_run_by_min_resource(self):
+    def _old_auto_run_by_min_resource(self):
         adventure_time = time.time()
         while 1:
             try:
-                resource_list = self.my_travian_account.Village.stock
-                if resource_list[4] < 15:
+                self.TRAVIAN.update_all_status()
+                stock_list = self.TRAVIAN.Village.stock
+                if stock_list[4] < 15:
                     gid = 4  # farm
                 else:
-                    gid = resource_list.index(min(resource_list[0:4])) + 1
-                status_dict = self.my_travian_account.Village.resource_status[gid_dict[str(gid)]]
+                    gid = stock_list.index(min(stock_list[0:4])) + 1
+                status_dict = self.TRAVIAN.Village.resource_status[gid_dict[str(gid)]]
                 oid = min(status_dict, key=status_dict.get)
                 if len(status_dict) > 1:
-                    if oid == self.my_travian_account.Village.last_upgrade_oid:
+                    if oid == self.TRAVIAN.Village.last_upgrade_oid:
                         tmp_dict = dict(status_dict)
                         tmp_dict.pop(oid)
                         oid = min(tmp_dict, key=tmp_dict.get)
-                status = self.my_travian_account.Village.upgrade(oid)
+                status = self.TRAVIAN.Village.upgrade(oid)
                 if status == "green":
                     time.sleep(random.randint(10, 20))
                 else:
                     time.sleep(random.randint(160, 180))
                 if time.time() > adventure_time + 1800:
-                    self.my_travian_account.Hero.go_adventure()
+                    self.TRAVIAN.Hero.go_adventure()
                     adventure_time = time.time()
             except ConnectionError:
                 logger("[ERROR] Connection Error.")
                 time.sleep(200)
-                self.my_travian_account = Travian("ts2", username, password)

@@ -64,6 +64,15 @@ def pprint_two_dicts_not_empty(d1, d2):
     pprint.pprint(d1)
 
 
+def update_upgraded_item_count(upgraded_dict, upgraded_item):
+    global gid_dict
+    if upgraded_item not in upgraded_dict:
+        upgraded_dict[upgraded_item] = 1
+    else:
+        upgraded_dict[upgraded_item] += 1
+    return upgraded_dict
+
+
 class Travian:
     def __init__(self, server, input_name, input_password):
         # init
@@ -354,30 +363,66 @@ class AlgoRunAs:
     def all_build_by_gid(self, gid_queue_dict):
         adventure_time = time.time()
         last_oid_dict = {}.fromkeys(self.TRAVIAN.village_newdid_list)
+        upgraded_item_dict = {}
         pprint.pprint(gid_queue_dict)
         while any(l for l in gid_queue_dict.values()):
             try:
                 for newdid in self.TRAVIAN.village_newdid_list:
                     if newdid in gid_queue_dict and bool(gid_queue_dict[newdid]) is True:
                         self.TRAVIAN.goto(newdid)
-                        # self.TRAVIAN.Village.update_all_status()
-                        last_gid = str(gid_queue_dict[newdid][0])
-                        if int(last_gid) > 4:
-                            status_dict = self.TRAVIAN.Village.building_status[gid_dict[last_gid]]
-                            oid = min(status_dict, key=status_dict.get)
+                        if gid_queue_dict[newdid] == "auto" or gid_queue_dict[newdid][0] == "auto":
+                            if len(self.TRAVIAN.Village.resource_status["農場"]) == 15:  # 15 田
+                                status_dict = self.TRAVIAN.Village.resource_status[gid_dict[str(4)]]
+                                min_food_level = status_dict[min(status_dict, key=status_dict.get)]
+                                brick_level = self.TRAVIAN.Village.resource_status["泥坑"]["16"]
+                                wood_level = self.TRAVIAN.Village.resource_status["伐木場"]["3"]
+                                steel_level = self.TRAVIAN.Village.resource_status["鐵礦場"]["4"]
+                                if brick_level < min_food_level - 3:
+                                    oid = "16"
+                                    last_gid = "2"
+                                elif wood_level < min_food_level - 3:
+                                    oid = "3"
+                                    last_gid = "1"
+                                elif steel_level < min_food_level - 3:
+                                    oid = "4"
+                                    last_gid = "3"
+                                else:
+                                    oid = min(status_dict, key=status_dict.get)
+                                    last_gid = "4"
+                            else:
+                                stock_list = self.TRAVIAN.Village.stock
+                                if stock_list[4] < 15:
+                                    last_gid = "4"  # farm
+                                else:
+                                    last_gid = str(stock_list.index(min(stock_list[0:4])) + 1)
+                                status_dict = self.TRAVIAN.Village.resource_status[gid_dict[str(last_gid)]]
+                                oid = min(status_dict, key=status_dict.get)
+                                if len(status_dict) > 1:
+                                    if oid == last_oid_dict[newdid]:
+                                        tmp_dict = dict(status_dict)
+                                        tmp_dict.pop(oid)
+                                        oid = min(tmp_dict, key=tmp_dict.get)
                         else:
-                            status_dict = self.TRAVIAN.Village.resource_status[gid_dict[last_gid]]
-                            oid = min(status_dict, key=status_dict.get)
-                            if oid == last_oid_dict[newdid]:
-                                tmp_dict = dict(status_dict)
-                                tmp_dict.pop(oid)
-                                oid = min(tmp_dict, key=tmp_dict.get)
+                            last_gid = str(gid_queue_dict[newdid][0])
+                            if int(last_gid) > 4:
+                                status_dict = self.TRAVIAN.Village.building_status[gid_dict[last_gid]]
+                                oid = min(status_dict, key=status_dict.get)
+                            else:
+                                status_dict = self.TRAVIAN.Village.resource_status[gid_dict[last_gid]]
+                                oid = min(status_dict, key=status_dict.get)
+                                if oid == last_oid_dict[newdid]:
+                                    tmp_dict = dict(status_dict)
+                                    tmp_dict.pop(oid)
+                                    oid = min(tmp_dict, key=tmp_dict.get)
                         status = self.TRAVIAN.Village.upgrade(oid)
                         if status == "green":
-                            logger(f"[UPGRADE] : [vid:{newdid}] - {gid_dict[last_gid]}")
+                            upgraded_item = gid_dict[str(last_gid)]
+                            logger(f"[UPGRADE] : [vid:{newdid}] - {upgraded_item}")
                             last_oid_dict[newdid] = oid
+                            upgraded_item_dict = update_upgraded_item_count(upgraded_item_dict, upgraded_item)
                             gid_queue_dict[newdid].pop(0)
-                            pprint.pprint(gid_queue_dict)
+                            if set(gid_queue_dict.values()) != {"auto"}:
+                                pprint.pprint(gid_queue_dict)
                     time.sleep(random.randint(3, 5))
                 time.sleep(random.randint(30, 60))
                 if time.time() > adventure_time + random.randint(3600, 4800):
@@ -388,11 +433,14 @@ class AlgoRunAs:
                 logger("[Error] Connection Error occured.")
             except KeyboardInterrupt:
                 logger("[Stop] by Keyboard Interruption.")
-                pprint.pprint(gid_queue_dict)
+                if set(gid_queue_dict.values()) != {"auto"}:
+                    pprint.pprint(gid_queue_dict)
+                print("\n - Upgraded item list in the Last Run:")
+                pprint.pprint(upgraded_item_dict)
                 exit(0)
         logger("[DONE] All queues are empty.")
 
-    def all_auto_by_min_resource(self):
+    def _old_all_auto_by_min_resource(self):
         adventure_time = time.time()
         last_oid_dict = {}.fromkeys(self.TRAVIAN.village_newdid_list)
         pprint_two_dicts_not_empty(self.TRAVIAN.Village.resource_status, self.TRAVIAN.Village.building_status)
@@ -433,7 +481,8 @@ class AlgoRunAs:
                                 oid = min(tmp_dict, key=tmp_dict.get)
                     status = self.TRAVIAN.Village.upgrade(oid)
                     if status == "green":
-                        logger(f"[UPGRADE] : [vid:{newdid}] - {gid_dict[gid]}")
+                        upgrade_item = gid_dict[str(gid)]
+                        logger(f"[UPGRADE] : [vid:{newdid}] - {upgrade_item}")
                         last_oid_dict[newdid] = oid
                     time.sleep(random.randint(3, 5))
                 time.sleep(random.randint(30, 60))

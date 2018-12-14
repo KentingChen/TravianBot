@@ -420,8 +420,9 @@ class AlgoRunAs:
                             logger(f"[UPGRADE] : [vid:{newdid}] - {upgraded_item}")
                             last_oid_dict[newdid] = oid
                             upgraded_item_dict = update_upgraded_item_count(upgraded_item_dict, upgraded_item)
-                            gid_queue_dict[newdid].pop(0)
-                            if set(gid_queue_dict.values()) != {"auto"}:
+                            if type(gid_queue_dict[newdid]) == list:
+                                gid_queue_dict[newdid].pop(0)
+                            if any(set(v) != set("auto") for v in gid_queue_dict.values()):
                                 pprint.pprint(gid_queue_dict)
                     time.sleep(random.randint(3, 5))
                 time.sleep(random.randint(30, 60))
